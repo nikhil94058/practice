@@ -1,0 +1,118 @@
+#include <cmath>
+#include <cstdio>
+#include <vector>
+#include <iostream>
+#include <algorithm>
+
+#include <map>
+#include <regex>
+
+using namespace std;
+
+class Tag {
+public:
+    Tag (string name, Tag *parent){
+        this->name = name;
+        this->parent = parent;
+    }
+    void display(){
+        cout << "[display] name: " << name << endl;
+        cout << "[display] childs: ";
+        for (auto child:childs) cout << child.first << " ";
+        cout << endl;
+        cout << "[display] attr: ";
+        for (auto att:attr) cout << att.first << ":" << att.second << " ";
+        cout << endl;
+        for (auto child:childs) child.second->display();
+    }
+    Tag * 
+    parseTag(string str){
+        smatch sm;
+        if (regex_search(str, sm, re_tag_beg)){
+            string name = sm[1];
+            string atts = sm[2];
+            // cout << "[tag] begin: " << name << " (" << atts << ")\n";
+            Tag *newchild = new Tag(name,this);
+            while (regex_search(atts, sm, re_attrdef)){
+                newchild->attr[sm[1]] = sm[2];
+                // cout << "[tag] att: " << sm[1] << "=" << sm[2] << endl;
+                atts = sm.suffix();
+            }
+            childs[name]=newchild;
+            return newchild;
+        }
+        if (regex_search(str, sm, re_tag_end)) {
+            // cout << "[tag] end: " << this->name << endl;
+            return this->parent;
+        }
+        return nullptr;
+    }
+    string
+    parseQuery(string str){
+        smatch sm;
+        Tag *node = this;
+        if (regex_search(str, sm, re_qu_qry)){
+            string path = sm[1];
+            string vname = sm[2];
+            while (regex_search(path, sm, re_qu_tag)){
+                string name = sm[1];
+                path = sm.suffix();
+                if (node->childs.count(name)==0){
+                    return missing;
+                }
+                // cout << "[query] goto tag: " << name << endl;
+                node = node->childs[name];
+            }
+            // cout << "[query] lookup att: " << vname << endl;
+            if (node->attr.count(vname) == 0){
+                return missing;
+            }
+            // cout << "[query] retrieve attr: " << vname << endl;
+            
+            return node->attr[vname];
+        }
+        return missing;
+    }
+private:
+    string name;
+    Tag *parent;
+    map<string,Tag *> childs;
+    map<string,string> attr;
+    static regex re_tag_beg;
+    static regex re_tag_end;
+    static regex re_attrdef;
+    static regex re_qu_qry;
+    static regex re_qu_tag;
+    static string missing;
+     
+};
+regex Tag::re_tag_beg {"<(\\w+)(.*)>"};
+regex Tag::re_tag_end {"</(.+)>"};
+regex Tag::re_attrdef {"(\\w+) = \"([^\"]*)\""};
+regex Tag::re_qu_qry {"((?:\\.|\\w)+)~(\\w+)"};
+regex Tag::re_qu_tag {"(\\w+)\\.?"} ;
+string Tag::missing = "Not Found!";
+
+
+int main() {
+    /* Read input from STDIN. Print output to STDOUT */
+    string line;
+    stringstream s;
+    getline(cin, line); s.str(line);
+    int n; s >> n;
+    int q; s >> q;
+    
+    Tag root("root", nullptr);
+    Tag *node = &root;
+    while(n--){
+        getline(cin, line);
+        node = node->parseTag(line);
+    }
+    // root.display();
+    
+    while(q--){
+        getline(cin, line);
+        cout << root.parseQuery(line) << endl;
+    }   
+    return 0;
+}
